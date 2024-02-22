@@ -13,15 +13,31 @@ char* decode_bencode(const char* bencoded_value) {
         const char* colon_index = strchr(bencoded_value, ':');
         if (colon_index != NULL) {
             const char* start = colon_index + 1;
+            char* decoded_str = (char*)malloc(length + 3);
+            snprintf(decoded_str, length + 3, "\"%.*s\"",length, start);
+//            strncpy(decoded_str+1, start, length);
+            decoded_str[length+2] = '\0';
+            return decoded_str;
+        } else {
+            fprintf(stderr, "Invalid encoded value: %s\n", bencoded_value);
+            exit(1);
+        }
+    }
+    else if(bencoded_value[0]=='i'){
+        const char * end = strchr(bencoded_value, 'e');
+        if (end != NULL) {
+            int length = end - bencoded_value - 1;
             char* decoded_str = (char*)malloc(length + 1);
-            strncpy(decoded_str, start, length);
+            snprintf(decoded_str, length + 1, "%.*s",length, bencoded_value+1);
             decoded_str[length] = '\0';
             return decoded_str;
         } else {
             fprintf(stderr, "Invalid encoded value: %s\n", bencoded_value);
             exit(1);
         }
-    } else {
+
+    }
+    else {
         fprintf(stderr, "Only strings are supported at the moment\n");
         exit(1);
     }
@@ -42,7 +58,7 @@ int main(int argc, char* argv[]) {
         // Uncomment this block to pass the first stage
          const char* encoded_str = argv[2];
          char* decoded_str = decode_bencode(encoded_str);
-         printf("\"%s\"\n", decoded_str);
+         printf("%s\n", decoded_str);
          free(decoded_str);
     } else {
         fprintf(stderr, "Unknown command: %s\n", command);
