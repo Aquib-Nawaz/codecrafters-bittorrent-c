@@ -83,6 +83,47 @@ char *decode_list(const char ** bencoded_value) {
     return NULL;
 }
 
+char* decode_dict(const char** bencoded_value){
+    (*bencoded_value)++;
+    char* keys[100];
+    char* values[100];
+    int i=0, length=3;
+    while (i<100&&*bencoded_value[0] != 'e') {
+        keys[i] = decode_bencode(bencoded_value);
+        values[i] = decode_bencode(bencoded_value);
+        length += strlen(keys[i])+ strlen(values[i])+1;
+        i++;
+    }
+    if(i>0)
+        length+=i-1;
+    if(*bencoded_value[0] == 'e') {
+        (*bencoded_value)++;
+        char* ret = malloc(length);
+        int j = 0;
+        ret[0] = '\0';
+        strcat(ret, "{");
+        for (; j < i-1; j++) {
+            strcat(ret, keys[j]);
+            strcat(ret, ":");
+            strcat(ret, values[j]);
+            free(keys[j]);
+            free(values[j]);
+            strcat(ret, ",");
+        }
+        if(i>0) {
+            strcat(ret, keys[j]);
+            strcat(ret, ":");
+            strcat(ret, values[j]);
+            free(keys[j]);
+            free(values[j]);
+        }
+        strcat(ret, "}");
+//        ret[length - 1] = '\0';
+        return ret;
+    }
+    return NULL;
+}
+
 char* decode_bencode(const char** bencoded_value) {
     if (is_digit(*bencoded_value[0])) {
         return decode_string(bencoded_value);
@@ -93,8 +134,11 @@ char* decode_bencode(const char** bencoded_value) {
     else if(*bencoded_value[0]=='l'){
         return decode_list(bencoded_value);
     }
+    else if(*bencoded_value[0]=='d'){
+        return decode_dict(bencoded_value);
+    }
     else {
-        fprintf(stderr, "Only strings are supported at the moment\n");
+        fprintf(stderr, "Only strings, int, list and dict are supported at the moment\n");
         exit(1);
     }
 }
