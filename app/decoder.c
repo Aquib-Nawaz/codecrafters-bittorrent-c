@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 bool is_digit(char c) {
     return c >= '0' && c <= '9';
@@ -60,11 +61,11 @@ char *decode_list(const char ** bencoded_value) {
     }
     if(i>0)
         length+=i-1;
-
     if (*bencoded_value[0] == 'e') {
         (*bencoded_value)++;
         char *ret = malloc(length);
         int j = 0;
+        ret[0]='\0';
         strcat(ret, "[");
         for (; j < i-1; j++) {
             strcat(ret, list_values[j]);
