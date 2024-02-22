@@ -52,12 +52,14 @@ char *decode_list(const char ** bencoded_value) {
     (*bencoded_value)++;
     char * list_values[100];
     int i=0;
-    int length = 2;
+    int length = 3;
     while (i<100&&*bencoded_value[0] != 'e') {
         list_values[i] = decode_bencode(bencoded_value);
-        length += 1 + strlen(list_values[i]);
+        length += strlen(list_values[i]);
         i++;
     }
+    if(i>0)
+        length+=i-1;
 
     if (*bencoded_value[0] == 'e') {
         (*bencoded_value)++;
@@ -69,8 +71,10 @@ char *decode_list(const char ** bencoded_value) {
             free(list_values[j]);
             strcat(ret, ",");
         }
-        strcat(ret, list_values[j]);
-        free(list_values[j]);
+        if(i>0) {
+            strcat(ret, list_values[j]);
+            free(list_values[j]);
+        }
         strcat(ret, "]");
         ret[length - 1] = '\0';
         return ret;
