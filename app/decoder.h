@@ -7,11 +7,51 @@
 
 #include <stdbool.h>
 
-char *decode_string(const char** );
-char *decode_int(const char** );
-char *decode_list(const char** );
-char *decode_dict(const char** );
-char* decode_bencode(const char** );
+#define ANNOUNCE "announce"
+#define INFO "info"
+#define LENGTH "length"
+
+enum bencode_type{
+    STRING,
+    INT,
+    LIST,
+    DICT
+};
+
+struct dict;
+struct list;
+
+struct bencode{
+    enum bencode_type type;
+    union{
+        char* str_value;
+        long int_value;
+        struct list* list_value;
+        struct dict* dict_value;
+    };
+};
+
+struct dict{
+  char **keys;
+  struct bencode** values;
+  int length;
+};
+
+struct list{
+    struct bencode** values;
+    int length;
+};
+
+void free_bencode(struct bencode*);
+struct bencode* decode_string(const char** );
+struct bencode* decode_int(const char** );
+struct bencode* decode_list(const char** );
+struct bencode* decode_dict(const char** );
+struct bencode* decode_bencode(const char** );
+
+void print_bencode(struct bencode*);
+
+struct bencode* search_dict(struct bencode*, const char*);
 
 bool is_digit(char c);
 
