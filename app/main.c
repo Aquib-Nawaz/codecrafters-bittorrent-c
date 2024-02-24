@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <assert.h>
 #include "decoder.h"
+
+int
+sha1digest(uint8_t *digest, char *hexdigest, const uint8_t *data, size_t databytes);
+
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
@@ -36,10 +39,24 @@ int main(int argc, char* argv[]) {
         assert(read_len < 2048);
         fclose(fptr);
         struct bencode* decoded_values = decode_bencode(&encoded_str);
-        char * tracker_url = search_dict(decoded_values, ANNOUNCE)->str_value;
-        long length = search_dict( search_dict(decoded_values, INFO), LENGTH)->int_value;
+        char * tracker_url = search_dict(decoded_values, ANNOUNCE)->str_value->value;
+        struct bencode* info = search_dict(decoded_values, INFO);
+        char *encoded_info = malloc(2048);
+        int len=0;
+        encode_bencode(info, encoded_info, &len);
+        long length = search_dict( info, LENGTH)->int_value;
+        unsigned char sha_value[20];
+        unsigned char* uencoded_info = to_unsigned_char(encoded_info, len);
+        sha1digest(sha_value, NULL, uencoded_info, len);
+        free(encoded_info);
+        free(uencoded_info);
         printf("Tracker URL: %s\n", tracker_url);
         printf("Length: %ld\n", length);
+        printf("Info Hash: ");
+        for(int i=0; i<20; i++){
+            printf("%02x", sha_value[i]);
+        }
+        printf("\n");
         free(decoded_values);
     }
     else {

@@ -19,12 +19,14 @@ struct bencode* decode_string(const char** bencoded_value) {
         if (colon_index != NULL) {
             const char *start = colon_index + 1;
             char *decoded_str = (char *) malloc(length + 1);
-            strncpy(decoded_str, start, length);
+            memcpy(decoded_str, start, length);
             decoded_str[length ] = '\0';
             *bencoded_value = start+length;
             struct bencode* ret_value = malloc(sizeof(struct bencode)); // return value
             ret_value->type = STRING;
-            ret_value->str_value = decoded_str;
+            ret_value->str_value = malloc(sizeof (struct string));
+            ret_value->str_value->value = decoded_str;
+            ret_value->str_value->length = length;
             return ret_value;
         } else {
             fprintf(stderr, "Invalid encoded value: %s\n", *bencoded_value);
@@ -96,7 +98,7 @@ struct bencode* decode_dict(const char** bencoded_value){
         ret_value->type =DICT;
         ret_value->dict_value = malloc(sizeof (struct dict));
         ret_value->dict_value->length=i;
-        ret_value->dict_value->keys= calloc(i, sizeof(char*));
+        ret_value->dict_value->keys= calloc(i, sizeof(struct string *));
         ret_value->dict_value->values= calloc(i, sizeof(struct bencode*));
         for (int j = 0; j < i; ++j) {
             assert(keys[j]->type == STRING );
@@ -130,7 +132,7 @@ struct bencode* decode_bencode(const char** bencoded_value) {
 void print_bencode(struct bencode* bencode) {
     switch (bencode->type) {
         case STRING:
-            printf("\"%s\"", bencode->str_value);
+            printf("\"%s\"", bencode->str_value->value);
             break;
         case INT:
             printf("%ld", bencode->int_value);
@@ -148,7 +150,7 @@ void print_bencode(struct bencode* bencode) {
         case DICT:
             printf("{");
             for (int i = 0; i < bencode->dict_value->length; ++i) {
-                printf("\"%s\":", bencode->dict_value->keys[i]);
+                printf("\"%s\":", bencode->dict_value->keys[i]->value);
                 print_bencode(bencode->dict_value->values[i]);
                 if (i < bencode->dict_value->length - 1) {
                     printf(",");
@@ -165,6 +167,7 @@ void free_bencode(struct bencode* val){
     }
     switch (val->type) {
         case STRING:
+            free(val->str_value->value);
             free(val->str_value);
             break;
         case INT:
@@ -178,6 +181,7 @@ void free_bencode(struct bencode* val){
             break;
         case DICT:
             for (int i = 0; i < val->dict_value->length; ++i) {
+                free(val->dict_value->keys[i]->value);
                 free(val->dict_value->keys[i]);
                 free_bencode(val->dict_value->values[i]);
             }
@@ -192,8 +196,52 @@ void free_bencode(struct bencode* val){
 struct bencode* search_dict(struct bencode* dict, const char* value){
     assert(dict->type==DICT);
     for(int i=0; i<dict->dict_value->length; i++){
-        if(strcmp(value, dict->dict_value->keys[i])==0)
+        if(strcmp(value, dict->dict_value->keys[i]->value)==0)
             return dict->dict_value->values[i];
     }
     return NULL;
 }
+
+void encode_bencode(struct bencode* value, char* encoded_str, int *st) {
+    switch (value->type) {
+        case STRING:{
+            *st+=sprintf(encoded_str+*st, "%d:", value->str_value->length);
+            memcpy(encoded_str+*st, value->str_value->value, value->str_value->length);
+            *st+=value->str_value->length;
+            break;
+        }
+        case INT:
+            *st+=sprintf(encoded_str+*st, "i%lde", value->int_value);
+            break;
+        case LIST:
+            strcat(encoded_str, "l");
+            *st+=1;
+            for (int i = 0; i < value->list_value->length; ++i) {
+                encode_bencode(value->list_value->values[i], encoded_str, st);
+            }
+            strcat(encoded_str, "e");
+            *st+=1;
+            break;
+        case DICT:
+            strcat(encoded_str, "d");
+            *st+=1;
+            for (int i = 0; i < value->dict_value->length; ++i) {
+                *st += sprintf(encoded_str+*st, "%d:", value->dict_value->keys[i]->length);
+                memcpy(encoded_str+*st, value->dict_value->keys[i]->value, value->dict_value->keys[i]->length);
+                *st+=value->dict_value->keys[i]->length;
+                encode_bencode(value->dict_value->values[i], encoded_str, st);
+            }
+            strcat(encoded_str, "e");
+            *st+=1;
+            break;
+    }
+}
+
+unsigned char* to_unsigned_char(const char* c, int len) {
+    unsigned char* result = malloc(len);
+    for (int i = 0; i < len; ++i) {
+        result[i] = c[i];
+    }
+    return result;
+}
+
