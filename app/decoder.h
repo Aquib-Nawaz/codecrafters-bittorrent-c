@@ -62,6 +62,7 @@ struct bencode* search_dict(struct bencode*, const char*);
 void encode_bencode(struct bencode* value, char* encoded_str, int *st);
 
 unsigned char* to_unsigned_char(const char* c, int len);
+void print2Hex(unsigned char * str, int len);
 
 bool is_digit(char c);
 

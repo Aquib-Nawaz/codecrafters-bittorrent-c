@@ -214,16 +214,16 @@ void encode_bencode(struct bencode* value, char* encoded_str, int *st) {
             *st+=sprintf(encoded_str+*st, "i%lde", value->int_value);
             break;
         case LIST:
-            strcat(encoded_str, "l");
+            encoded_str[*st]='l';
             *st+=1;
             for (int i = 0; i < value->list_value->length; ++i) {
                 encode_bencode(value->list_value->values[i], encoded_str, st);
             }
-            strcat(encoded_str, "e");
+            encoded_str[*st]='e';
             *st+=1;
             break;
         case DICT:
-            strcat(encoded_str, "d");
+            encoded_str[*st]='d';
             *st+=1;
             for (int i = 0; i < value->dict_value->length; ++i) {
                 *st += sprintf(encoded_str+*st, "%d:", value->dict_value->keys[i]->length);
@@ -231,7 +231,7 @@ void encode_bencode(struct bencode* value, char* encoded_str, int *st) {
                 *st+=value->dict_value->keys[i]->length;
                 encode_bencode(value->dict_value->values[i], encoded_str, st);
             }
-            strcat(encoded_str, "e");
+            encoded_str[*st]='e';
             *st+=1;
             break;
     }
@@ -245,3 +245,9 @@ unsigned char* to_unsigned_char(const char* c, int len) {
     return result;
 }
 
+void print2Hex(unsigned char * str, int len) {
+    for (int i = 0; i < len; ++i) {
+        printf("%02x", str[i]);
+    }
+    printf("\n");
+}

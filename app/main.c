@@ -45,18 +45,33 @@ int main(int argc, char* argv[]) {
         int len=0;
         encode_bencode(info, encoded_info, &len);
         long length = search_dict( info, LENGTH)->int_value;
+        long piece_length = search_dict( info, "piece length")->int_value;
+
         unsigned char sha_value[20];
         unsigned char* uencoded_info = to_unsigned_char(encoded_info, len);
+
+//        FILE * wptr = fopen("out1.txt", "wb");
+//        fwrite(uencoded_info, 1, len, wptr);
+//        fclose(wptr);
+
         sha1digest(sha_value, NULL, uencoded_info, len);
         free(encoded_info);
         free(uencoded_info);
+
         printf("Tracker URL: %s\n", tracker_url);
         printf("Length: %ld\n", length);
         printf("Info Hash: ");
-        for(int i=0; i<20; i++){
-            printf("%02x", sha_value[i]);
+        print2Hex(sha_value, 20);
+        printf("Piece Length: %ld\n", piece_length);
+        printf("Piece Hashes:\n");
+
+        struct bencode* piece_hashes = search_dict( info, "pieces");
+        unsigned char *uhash;
+        for(int i=0; i<piece_hashes->str_value->length; i+=20){
+            uhash = to_unsigned_char(piece_hashes->str_value->value+i, 20);
+            print2Hex(uhash, 20);
+            free(uhash);
         }
-        printf("\n");
         free(decoded_values);
     }
     else {
