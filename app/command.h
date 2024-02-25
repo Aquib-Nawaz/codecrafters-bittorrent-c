@@ -14,6 +14,12 @@ struct MemoryStruct {
     size_t size;
 };
 
+struct MetaInfo{
+    char* tracker_url;
+    struct bencode* decoded_value;
+    unsigned char* info_hash;
+};
+
 size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp);
 
 #endif //CODECRAFTERS_BITTORRENT_C_COMMAND_H

@@ -44,36 +44,57 @@ void decode_command(const char* encoded_str){
     free(decoded_values);
 }
 
-void info_command(char* filename){
+struct MetaInfo decode_meta_info(char* filename){
+
     FILE* fptr = fopen(filename, "r");
     if (fptr == NULL) {
         printf("Could not open file %s", filename);
         exit(1);
     }
+
     const char* encoded_str = malloc(2048);
     size_t read_len = fread((void*)encoded_str,1, 2048, fptr);
     assert(read_len < 2048);
     fclose(fptr);
 
     struct bencode* decoded_values = decode_bencode(&encoded_str);
-    char * tracker_url = search_dict(decoded_values, ANNOUNCE)->str_value->value;
+    struct MetaInfo meta_info;
+
+    meta_info.decoded_value = decoded_values;
+
     struct bencode* info = search_dict(decoded_values, INFO);
-    struct bencode* piece_hashes = search_dict( info, "pieces");
+    meta_info.tracker_url = search_dict(decoded_values, ANNOUNCE)->str_value->value;
 
     char *encoded_info = malloc(2048);
+
     int len=0;
     encode_bencode(info, encoded_info, &len);
-    long length = search_dict( info, LENGTH)->int_value;
-    long piece_length = search_dict( info, "piece length")->int_value;
-
-    unsigned char sha_value[20];
+    unsigned char *sha_value = malloc(20);
     unsigned char* uencoded_info = to_unsigned_char(encoded_info, len);
 
-
     sha1digest(sha_value, NULL, uencoded_info, len);
+    meta_info.info_hash = sha_value;
 
     free(encoded_info);
     free(uencoded_info);
+
+    free(encoded_str-read_len);
+    return meta_info;
+}
+
+void info_command(char* filename){
+
+    struct MetaInfo meta_info = decode_meta_info(filename);
+    struct bencode* decoded_values = meta_info.decoded_value;
+    char * tracker_url = meta_info.tracker_url;
+
+    struct bencode* info = search_dict(decoded_values, INFO);
+    struct bencode* piece_hashes = search_dict( info, "pieces");
+
+    long length = search_dict( info, LENGTH)->int_value;
+    long piece_length = search_dict( info, "piece length")->int_value;
+
+    unsigned char *sha_value = meta_info.info_hash;
 
     printf("Tracker URL: %s\n", tracker_url);
     printf("Length: %ld\n", length);
@@ -92,33 +113,13 @@ void info_command(char* filename){
 }
 
 void peers_command(char* filename){
-    FILE* fptr = fopen(filename, "r");
-    if (fptr == NULL) {
-        printf("Could not open file %s", filename);
-        exit(1);
-    }
-    const char* encoded_str = malloc(2048);
-    size_t read_len = fread((void*)encoded_str,1, 2048, fptr);
-    assert(read_len < 2048);
-    fclose(fptr);
 
-    struct bencode* decoded_values = decode_bencode(&encoded_str);
-    char * tracker_url = search_dict(decoded_values, ANNOUNCE)->str_value->value;
+    struct MetaInfo meta_info = decode_meta_info(filename);
+    struct bencode* decoded_values = meta_info.decoded_value;
+    char * tracker_url = meta_info.tracker_url;
     struct bencode* info = search_dict(decoded_values, INFO);
-    struct bencode* piece_hashes = search_dict( info, "pieces");
 
-    char *encoded_info = malloc(2048);
-    int len=0;
-    encode_bencode(info, encoded_info, &len);
     long length = search_dict( info, LENGTH)->int_value;
-    long piece_length = search_dict( info, "piece length")->int_value;
-
-    unsigned char sha_value[20];
-    unsigned char* uencoded_info = to_unsigned_char(encoded_info, len);
-    sha1digest(sha_value,NULL, uencoded_info, len);
-
-    free(encoded_info);
-    free(uencoded_info);
 
     CURL *curl_handle = curl_easy_init();
     CURLcode res;
@@ -127,7 +128,7 @@ void peers_command(char* filename){
     chunk.memory = malloc(1);
     chunk.size = 0;
 
-    char* url_encoded_hash = curl_easy_escape(curl_handle, sha_value, 20);
+    char* url_encoded_hash = curl_easy_escape(curl_handle, meta_info.info_hash, 20);
 
     char url_with_parameters[1024];
     char peer_id[] = "22101999935711102001";
@@ -147,7 +148,7 @@ void peers_command(char* filename){
         if(res != CURLE_OK) {
             fprintf(stderr, "error: %s\n", curl_easy_strerror(res));
         } else {
-            struct bencode* decoded_response = decode_bencode(&chunk.memory);
+            struct bencode* decoded_response = decode_bencode((const char **) &chunk.memory);
 
             struct bencode* peers = search_dict(decoded_response, "peers");
             unsigned char* peers_ip = to_unsigned_char(peers->str_value->value, peers->str_value->length);
