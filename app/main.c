@@ -1,8 +1,5 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "decoder.h"
 #include "command.h"
 
 int main(int argc, char* argv[]) {
@@ -22,6 +19,14 @@ int main(int argc, char* argv[]) {
     else if(strcmp(command, "peers")==0){
         peers_command(argv[2]);
     }
+    else if(strcmp(command, "handshake")==0){
+        if (argc < 4) {
+            fprintf(stderr, "Usage: your_bittorrent.sh <command> <args> <peer_ip>:<peer_port>\n");
+            return 1;
+        }
+        handshake_command(argv[2], argv[3]);
+    }
+
     else {
         fprintf(stderr, "Unknown command: %s\n", command);
         return 1;

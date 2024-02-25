@@ -9,6 +9,9 @@
 #include <assert.h>
 #include <curl/curl.h>
 #include <string.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 
 int
 sha1digest(uint8_t *digest, char *hexdigest, const uint8_t *data, size_t databytes);
@@ -78,7 +81,7 @@ struct MetaInfo decode_meta_info(char* filename){
     free(encoded_info);
     free(uencoded_info);
 
-    free(encoded_str-read_len);
+    free((char *)encoded_str-read_len);
     return meta_info;
 }
 
@@ -128,13 +131,12 @@ void peers_command(char* filename){
     chunk.memory = malloc(1);
     chunk.size = 0;
 
-    char* url_encoded_hash = curl_easy_escape(curl_handle, meta_info.info_hash, 20);
+    char* url_encoded_hash = curl_easy_escape(curl_handle, (char *)meta_info.info_hash, 20);
 
     char url_with_parameters[1024];
-    char peer_id[] = "22101999935711102001";
     sprintf(url_with_parameters, "%s?info_hash=%s&peer_id=%s"
-                                               "&port=6881&uploaded=0&downloaded=0&left=%ld"
-                                               "&compact=1", tracker_url, url_encoded_hash, peer_id, length);
+                                               "&port=%d&uploaded=0&downloaded=0&left=%ld"
+                                               "&compact=1", tracker_url, url_encoded_hash, PEER_ID, PORT, length);
     free(url_encoded_hash);
 
     if(curl_handle) {
@@ -163,4 +165,64 @@ void peers_command(char* filename){
 //        free(chunk.memory);
     }
     free(decoded_values);
+}
+
+void handshake_command(char* filname, char* peer_ip_port){
+    const char* colon = strchr(peer_ip_port, ':');
+    char peer_ip[colon-peer_ip_port+1];
+    peer_ip[colon-peer_ip_port] = '\0';
+    memcpy(peer_ip, peer_ip_port, colon-peer_ip_port);
+    int peer_port = atoi(colon+1);
+
+    struct MetaInfo info = decode_meta_info(filname);
+    struct HandShake message;
+    message.protocol_len=19;
+    memcpy(message.protocol, PROTOCOL, 19);
+    message.reserved=0;
+    memcpy(message.info_hash , info.info_hash, 20);
+    memcpy(message.peer_id , PEER_ID, 20);
+
+    struct sockaddr_in localaddr, remoteaddr;
+    localaddr.sin_family = AF_INET;
+    localaddr.sin_port = htons(PORT);
+    localaddr.sin_addr.s_addr = INADDR_ANY;
+
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0) {
+        perror("socket");
+        exit(1);
+    }
+
+    remoteaddr.sin_family = AF_INET;
+    remoteaddr.sin_addr.s_addr = inet_addr(peer_ip);
+    remoteaddr.sin_port = htons(peer_port);
+
+    if(connect(sockfd, (struct sockaddr *)&remoteaddr, sizeof(remoteaddr)) < 0) {
+        perror("connect");
+        exit(1);
+    }
+
+    int bytes;
+    int sent = 0;
+    int total = sizeof(message);
+    do {
+        bytes = write(sockfd,&message, total-sent);
+        if (bytes < 0)
+            perror("ERROR writing message to socket");
+        if (bytes == 0)
+            break;
+        sent+=bytes;
+    } while (sent < total);
+
+    struct HandShake response={0};
+
+    bytes = read(sockfd, &response, sizeof response);
+    if (bytes != sizeof response)
+        perror("ERROR reading from socket");
+
+    print2Hex( response.peer_id, 20);
+    close(sockfd);
+
+
 }
