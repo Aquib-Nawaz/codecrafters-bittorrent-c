@@ -220,7 +220,7 @@ void handshake_command(char* filname, char* peer_ip_port){
     bytes = read(sockfd, &response, sizeof response);
     if (bytes != sizeof response)
         perror("ERROR reading from socket");
-
+    printf("Peer ID: ");
     print2Hex( response.peer_id, 20);
     close(sockfd);
 
