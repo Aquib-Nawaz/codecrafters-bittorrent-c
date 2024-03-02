@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 #include "command.h"
 
 int main(int argc, char* argv[]) {
@@ -37,6 +38,14 @@ int main(int argc, char* argv[]) {
         }
         else if(strcmp(command, "download_piece")==0){
             unsigned char * peers = peers_command(metaInfo);
+            FILE* fptr = fopen(argv[3], "wb");
+            if(!fptr){
+                char *err_message;
+                err_message = strerror(errno);
+                fprintf(stderr, "[ERROR] Could not open file %s for writing :- %s\n",argv[3], err_message);
+                exit( 1);
+            }
+            fclose(fptr);
             download_piece_command(argv[3], peers, metaInfo, atoi(argv[5]), 0);
             free(peers);
         }

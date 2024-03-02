@@ -405,11 +405,11 @@ bool download_piece_command(char* out_filename, unsigned char * peers, struct Me
         exit(1);
     }
 
-    FILE* fptr = fopen(out_filename, "ab");
+    FILE* fptr = fopen(out_filename, "r+b");
     if(!fptr){
         char *err_message;
         err_message = strerror(errno);
-        fprintf(stderr, "[ERROR] Could not open file for writing :- %s\n", err_message);
+        fprintf(stderr, "[ERROR] Could not open piece file for writing :- %s\n", err_message);
         exit( 1);
     }
 
@@ -446,14 +446,6 @@ bool download_piece_command(char* out_filename, unsigned char * peers, struct Me
     int fileoffset = piece_num*piece_length*file_mode;
     char *buffer = malloc(pieceInfo.cur_piece_length);
 
-    fptr = fopen(out_filename, "rb");
-    if(!fptr){
-        char *err_message;
-        err_message = strerror(errno);
-        fprintf(stderr, "[ERROR] Could not open file for reading :- %s\n", err_message);
-        exit( 1);
-    }
-
     fseek(fptr, fileoffset, SEEK_SET);
     fread(buffer, 1, pieceInfo.cur_piece_length, fptr);
     unsigned char *sha_value = malloc(20);
@@ -476,11 +468,19 @@ void download_command(char* out_filename, unsigned char* peers, struct MetaInfo 
     struct bencode *info = search_dict(meta_info.decoded_value, INFO);
     int total_piece = search_dict(info, "pieces")->str_value->length / 20;
     bool piece_downloaded;
+    FILE* fptr = fopen(out_filename, "wb");
+    if(!fptr){
+        char *err_message;
+        err_message = strerror(errno);
+        fprintf(stderr, "[ERROR] Could not open file for writing :- %s\n", err_message);
+        exit( 1);
+    }
+    fclose(fptr);
     for (int i = 0; i < total_piece; i++) {
         do{
             printf("[INFO] Attempting piece download: %d\n", i);
             piece_downloaded = download_piece_command(out_filename, peers, meta_info, i, 1);
-            break;
+//            break;
         }while(!piece_downloaded);
     }
 }
