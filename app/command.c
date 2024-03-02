@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 int
 sha1digest(uint8_t *digest, char *hexdigest, const uint8_t *data, size_t databytes);
@@ -260,7 +261,7 @@ void send_message(CURL *curl_handle,char message_type, int curl_socket, struct M
     send_message[4] = message_type;
     memcpy(send_message+5, message->memory, message->size);
     printf("SENDING: ");
-    print2Hex(send_message, 4+payload_len);
+    print2Hex((unsigned char *)send_message, 4+payload_len);
     CURLcode res;
     size_t nsent_total = 0;
     do{
@@ -293,7 +294,9 @@ void handle_received_message(CURL *curl_handle, int curl_socket, struct MemorySt
 
             memcpy(&piece_offset, input_message->memory+5,4);
             piece_offset = ntohl(piece_offset);
-
+            if(piece_info->file_mode){
+                piece_offset+=piece_info->cur_piece_index*piece_info->piece_length;
+            }
             fseek(piece_info->fp, piece_offset, SEEK_SET);
             fwrite(input_message->memory+9,1, input_message->size-9,piece_info->fp);
             piece_info->cur_piece_offset+=input_message->size-9;
@@ -386,7 +389,7 @@ void receive_message(CURL* curl_handle, int curl_socket ,struct MemoryStruct* ch
 
 }
 
-void download_piece_command(char* out_filename, unsigned char * peers, struct MetaInfo meta_info, int piece_num){
+bool download_piece_command(char* out_filename, unsigned char * peers, struct MetaInfo meta_info, int piece_num, uint8_t file_mode){
 
     CURL *curl_handle;
     CURLcode res;
@@ -402,9 +405,11 @@ void download_piece_command(char* out_filename, unsigned char * peers, struct Me
         exit(1);
     }
 
-    FILE* fptr = fopen(out_filename, "wb");
+    FILE* fptr = fopen(out_filename, "ab");
     if(!fptr){
-        fprintf(stderr, "[ERROR] Could not open file for writing \n");
+        char *err_message;
+        err_message = strerror(errno);
+        fprintf(stderr, "[ERROR] Could not open file for writing :- %s\n", err_message);
         exit( 1);
     }
 
@@ -429,11 +434,53 @@ void download_piece_command(char* out_filename, unsigned char * peers, struct Me
             .cur_piece_offset = 0,
             .cur_piece_length =cur_piece_length,
             .fp = fptr,
+            .file_mode = file_mode
     };
 
     receive_message(curl_handle, curl_socket, &chunk, &pieceInfo);
     free(chunk.memory);
-    curl_easy_cleanup(curl_handle);
-//    printf("Data: size:-%zu %s\n",chunk.size, chunk.memory);
+    assert(pieceInfo.cur_piece_offset == pieceInfo.cur_piece_length);
+    /**
+     * SHA1 Checksum
+    */
+    int fileoffset = piece_num*piece_length*file_mode;
+    char *buffer = malloc(pieceInfo.cur_piece_length);
 
+    fptr = fopen(out_filename, "rb");
+    if(!fptr){
+        char *err_message;
+        err_message = strerror(errno);
+        fprintf(stderr, "[ERROR] Could not open file for reading :- %s\n", err_message);
+        exit( 1);
+    }
+
+    fseek(fptr, fileoffset, SEEK_SET);
+    fread(buffer, 1, pieceInfo.cur_piece_length, fptr);
+    unsigned char *sha_value = malloc(20);
+    sha1digest(sha_value, NULL, (unsigned char *)buffer, pieceInfo.cur_piece_length);
+    free(buffer);
+
+    bool ret;
+    ret = memcmp(sha_value, piece_hashes->str_value->value+20*piece_num, 20) ==0;
+
+    free(sha_value);
+    curl_easy_cleanup(curl_handle);
+    fclose(fptr);
+
+    return ret;
+    //    printf("Data: size:-%zu %s\n",chunk.size, chunk.memory);
+
+}
+
+void download_command(char* out_filename, unsigned char* peers, struct MetaInfo meta_info) {
+    struct bencode *info = search_dict(meta_info.decoded_value, INFO);
+    int total_piece = search_dict(info, "pieces")->str_value->length / 20;
+    bool piece_downloaded;
+    for (int i = 0; i < total_piece; i++) {
+        do{
+            printf("[INFO] Attempting piece download: %d\n", i);
+            piece_downloaded = download_piece_command(out_filename, peers, meta_info, i, 1);
+            break;
+        }while(!piece_downloaded);
+    }
 }

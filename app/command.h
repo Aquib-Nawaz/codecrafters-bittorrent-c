@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <curl/curl.h>
+#include <stdbool.h>
 
 #define PEER_ID "22101999935711102001"
 #define PROTOCOL "BitTorrent protocol"
@@ -29,8 +30,8 @@ void decode_command(const char*);
 void info_command(struct MetaInfo);
 unsigned char * peers_command( struct MetaInfo);
 CURL* handshake_command( char*, struct MetaInfo);
-void download_piece_command(char*,unsigned char *, struct MetaInfo, int);
-
+bool download_piece_command(char*,unsigned char *, struct MetaInfo, int, uint8_t );
+void download_command(char*, unsigned char*, struct MetaInfo);
 
 struct __attribute__((__packed__)) HandShake{
     char protocol_len;
@@ -46,6 +47,7 @@ struct PieceInfo {
     int cur_piece_index;
     int cur_piece_offset;
     int cur_piece_length;
+    uint8_t file_mode;
     FILE* fp;
 
 } ;

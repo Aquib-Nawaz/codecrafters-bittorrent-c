@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
     else{
         struct MetaInfo metaInfo;
 
-        if(strcmp(command, "download_piece")!=0)
+        if(strncmp(command, "download", 8)!=0)
              metaInfo = decode_meta_info(argv[2]);
         else
             metaInfo = decode_meta_info(argv[4]);
@@ -37,10 +37,14 @@ int main(int argc, char* argv[]) {
         }
         else if(strcmp(command, "download_piece")==0){
             unsigned char * peers = peers_command(metaInfo);
-            download_piece_command(argv[3], peers, metaInfo, atoi(argv[5]));
+            download_piece_command(argv[3], peers, metaInfo, atoi(argv[5]), 0);
             free(peers);
         }
-
+        else if(strcmp(command, "download")==0){
+            unsigned char * peers = peers_command(metaInfo);
+            download_command(argv[3], peers, metaInfo);
+            free(peers);
+        }
         else {
             fprintf(stderr, "Unknown command: %s\n", command);
             return 1;
